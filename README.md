@@ -46,10 +46,35 @@ nix run github:jamtur01/nix-omp
     # rules.style = ./rules/style.md;        # ~/.omp/agent/rules/style.md
     # commands.deploy = ./commands/deploy.md;
     # skills.my-skill = ./skills/my-skill;   # ~/.omp/agent/skills/my-skill
+    # extensions = [ ./extensions/my-extension.ts ];
     # appendSystemPrompt = "Be concise.";
+
+    hindsight = {
+      enable = true;                         # memory.backend = hindsight
+      apiUrl = "https://hindsight.example.com";
+      scoping = "per-project-tagged";
+      # settings.autoRecall = true;          # any other hindsight.* key
+    };
   };
 }
 ```
+
+### Hindsight token
+
+The `hindsight` backend's API token is **not** a module option — writing it to
+`config.yml` would put the secret in the world-readable Nix store. omp reads
+`HINDSIGHT_API_TOKEN` from the environment (it overrides the setting), so supply
+it out of band, e.g. with sops-nix:
+
+```nix
+# token rendered to a file by sops-nix, exported into the session environment
+home.sessionVariablesExtra = ''
+  export HINDSIGHT_API_TOKEN="$(cat ${config.sops.secrets.hindsight-token.path})"
+'';
+```
+
+The module asserts if `hindsight.settings.apiToken` is set, to catch the
+store-leak mistake.
 
 ### Package only (nix-darwin / NixOS)
 
