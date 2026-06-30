@@ -120,3 +120,10 @@ platform hashes (needs `gh`, `nix`, `jq`).
   binary-fetch approach and config path mapping are adapted from this.
 - [lukasl-dev/pi.nix](https://github.com/lukasl-dev/pi.nix) — flake/module
   layout inspiration (targets upstream `pi`, not omp).
+
+## License
+
+Copyright (c) 2026 James Turnbull.
+
+Released under the [MIT License](LICENSE). This packaging only; `omp` itself is
+distributed under its own upstream terms.
