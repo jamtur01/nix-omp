@@ -45,9 +45,29 @@ let
     )
   ) cfg.skills;
 
+  # Extension modules are discovered from `~/.omp/agent/extensions/`; link each
+  # by its file name.
+  extensionFiles = lib.listToAttrs (
+    map (
+      p: lib.nameValuePair "${agentDir}/extensions/${baseNameOf (toString p)}" { source = p; }
+    ) cfg.extensions
+  );
+
+  # The `hindsight` memory backend is configured through `hindsight.*` keys in
+  # config.yml. The API token is deliberately not a module option: it must come
+  # from the `HINDSIGHT_API_TOKEN` environment variable (which overrides the
+  # setting) so the secret never lands in the world-readable Nix store.
+  hindsightBlock = lib.optionalAttrs cfg.hindsight.enable {
+    memory.backend = "hindsight";
+    hindsight =
+      lib.filterAttrs (_: v: v != null) { inherit (cfg.hindsight) apiUrl scoping; }
+      // cfg.hindsight.settings;
+  };
+
   # omp shows a setup wizard until `setupVersion` is recorded; inject a value so
-  # a declaratively-configured install starts straight into the agent.
-  configContents = { setupVersion = 1; } // cfg.settings;
+  # a declaratively-configured install starts straight into the agent. User
+  # `settings` deep-merge last so they can override the derived blocks.
+  configContents = lib.recursiveUpdate ({ setupVersion = 1; } // hindsightBlock) cfg.settings;
 in
 {
   options.programs.omp = {
@@ -119,8 +139,49 @@ in
     skills = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      example = lib.literalExpression ''{ my-skill = ./skills/my-skill; }'';
+      example = lib.literalExpression "{ my-skill = ./skills/my-skill; }";
       description = "Skills linked into `~/.omp/agent/skills/<name>` (a path or a `home.file` attrset).";
+    };
+
+    extensions = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      example = lib.literalExpression "[ ./extensions/my-extension.ts ]";
+      description = "Extension module files linked into `~/.omp/agent/extensions/` (discovered by file name).";
+    };
+
+    hindsight = {
+      enable = lib.mkEnableOption "the Hindsight long-term memory backend (`memory.backend = hindsight`)";
+
+      apiUrl = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "https://hindsight.example.com";
+        description = ''
+          `hindsight.apiUrl`. The API token must be supplied out of band via the
+          `HINDSIGHT_API_TOKEN` environment variable (e.g. rendered by sops-nix),
+          which overrides the setting — never write it to the Nix store.
+        '';
+      };
+
+      scoping = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "global"
+            "per-project"
+            "per-project-tagged"
+          ]
+        );
+        default = null;
+        description = "`hindsight.scoping`.";
+      };
+
+      settings = lib.mkOption {
+        type = yaml.type;
+        default = { };
+        example = lib.literalExpression "{ autoRecall = true; mentalModelsEnabled = true; }";
+        description = "Extra `hindsight.*` keys merged into config.yml (e.g. `autoRetain`, `retainMode`, `recallBudget`).";
+      };
     };
 
     systemPrompt = lib.mkOption {
@@ -137,6 +198,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = !(cfg.hindsight.settings ? apiToken);
+        message = "programs.omp.hindsight.settings.apiToken would write the token into the world-readable Nix store; set the HINDSIGHT_API_TOKEN environment variable instead.";
+      }
+    ];
+
     home.packages = [ cfg.package ];
 
     home.file = lib.mkMerge [
@@ -146,6 +214,7 @@ in
       (docFiles "prompts" "md" cfg.prompts)
       (jsonFiles "themes" cfg.themes)
       skillFiles
+      extensionFiles
       (lib.mkIf (configContents != { }) {
         "${agentDir}/config.yml".source = yaml.generate "omp-config.yml" configContents;
       })

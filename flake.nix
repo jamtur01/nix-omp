@@ -37,6 +37,8 @@
 
       formatter = forAllSystems (system: (pkgsFor system).nixfmt);
 
-      checks = forAllSystems (system: { omp = self.packages.${system}.omp; });
+      checks = forAllSystems (system: {
+        omp = self.packages.${system}.omp;
+      });
     };
 }
