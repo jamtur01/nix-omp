@@ -53,6 +53,27 @@ let
     ) cfg.extensions
   );
 
+  # Custom tool files/dirs are discovered from `~/.omp/agent/tools/`; link each
+  # by its name (a file like `my-tool.ts` or a directory with `index.ts`).
+  toolFiles = lib.listToAttrs (
+    map (p: lib.nameValuePair "${agentDir}/tools/${baseNameOf (toString p)}" { source = p; }) cfg.tools
+  );
+
+  # Hooks live under `~/.omp/agent/hooks/<phase>/<name>`, where the file's base
+  # name is the tool it fires for (`*` matches all tools). They are invoked as
+  # executables, so mark them +x.
+  hookFiles =
+    phase: attrs:
+    lib.mapAttrs' (
+      name: value:
+      lib.nameValuePair "${agentDir}/hooks/${phase}/${name}" (
+        (if lib.isPath value || lib.isStorePath value then { source = value; } else { text = value; })
+        // {
+          executable = true;
+        }
+      )
+    ) attrs;
+
   # The `hindsight` memory backend is configured through `hindsight.*` keys in
   # config.yml. The API token is deliberately not a module option: it must come
   # from the `HINDSIGHT_API_TOKEN` environment variable (which overrides the
@@ -194,6 +215,29 @@ in
       description = "Extension module files linked into `~/.omp/agent/extensions/` (discovered by file name).";
     };
 
+    tools = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      example = lib.literalExpression "[ ./tools/my-tool.ts ]";
+      description = "Custom tool files or directories linked into `~/.omp/agent/tools/` (discovered by name).";
+    };
+
+    hooks = {
+      pre = lib.mkOption {
+        type = lib.types.attrsOf (lib.types.either lib.types.lines lib.types.path);
+        default = { };
+        example = lib.literalExpression "{ bash = ./hooks/pre-bash.sh; }";
+        description = "Pre-tool hooks linked into `~/.omp/agent/hooks/pre/<name>` (name is the tool to hook, or `*` for all).";
+      };
+
+      post = lib.mkOption {
+        type = lib.types.attrsOf (lib.types.either lib.types.lines lib.types.path);
+        default = { };
+        example = lib.literalExpression ''{ "*" = ./hooks/post-all.sh; }'';
+        description = "Post-tool hooks linked into `~/.omp/agent/hooks/post/<name>` (name is the tool to hook, or `*` for all).";
+      };
+    };
+
     hindsight = {
       enable = lib.mkEnableOption "the Hindsight long-term memory backend (`memory.backend = hindsight`)";
 
@@ -263,6 +307,9 @@ in
       (jsonFiles "themes" cfg.themes)
       skillFiles
       extensionFiles
+      toolFiles
+      (hookFiles "pre" cfg.hooks.pre)
+      (hookFiles "post" cfg.hooks.post)
       (lib.mkIf (configContents != { }) {
         "${agentDir}/config.yml".source = yaml.generate "omp-config.yml" configContents;
       })
