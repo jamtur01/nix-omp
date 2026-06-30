@@ -1,0 +1,47 @@
+name: update
+
+# Check for a new oh-my-pi release daily and maintain a single auto-update PR.
+# A fixed branch means create-pull-request updates the same PR in place each run,
+# so only the latest version is ever open — older proposals are superseded, not
+# stacked.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: omp-update
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+
+      - name: Refresh VERSION.json
+        run: bash ./update.sh
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(jq -r .version VERSION.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: omp-update
+          delete-branch: true
+          commit-message: "chore: update omp to ${{ steps.ver.outputs.version }}"
+          title: "chore: update omp to ${{ steps.ver.outputs.version }}"
+          body: |
+            Automated update to oh-my-pi `${{ steps.ver.outputs.version }}`.
+
+            Hashes are read from the GitHub release asset digests by `update.sh`;
+            Nix verifies each binary against them at build time.
