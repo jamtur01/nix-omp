@@ -47,6 +47,9 @@ nix run github:jamtur01/nix-omp
     # commands.deploy = ./commands/deploy.md;
     # skills.my-skill = ./skills/my-skill;   # ~/.omp/agent/skills/my-skill
     # extensions = [ ./extensions/my-extension.ts ];
+    # tools = [ ./tools/my-tool.ts ];        # ~/.omp/agent/tools/
+    # hooks.pre.bash = ./hooks/pre-bash.sh;  # fires before the bash tool
+    # hooks.post."*" = ./hooks/post-all.sh;  # fires after every tool
     # appendSystemPrompt = "Be concise.";
 
     hindsight = {
@@ -102,6 +105,8 @@ The Home Manager module writes into the default profile's agent directory,
 | `rules.<n>` / `commands.<n>` / `agents.<n>` / `prompts.<n>` | `<dir>/<n>.md` |
 | `themes.<n>` | `themes/<n>.json` |
 | `skills.<n>` | `skills/<n>` |
+| `extensions` / `tools` | `extensions/<basename>` / `tools/<basename>` |
+| `hooks.pre.<n>` / `hooks.post.<n>` | `hooks/pre/<n>` / `hooks/post/<n>` (executable; `<n>` = tool or `*`) |
 | `systemPrompt` / `appendSystemPrompt` | `SYSTEM.md` / `APPEND_SYSTEM.md` |
 
 ## Updating
