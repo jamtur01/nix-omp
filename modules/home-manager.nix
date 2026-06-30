@@ -68,6 +68,50 @@ let
   # a declaratively-configured install starts straight into the agent. User
   # `settings` deep-merge last so they can override the derived blocks.
   configContents = lib.recursiveUpdate ({ setupVersion = 1; } // hindsightBlock) cfg.settings;
+
+  # Secret-bearing config keys: writing any of these into config.yml lands the
+  # secret in the world-readable Nix store. Each has an env-var/OAuth equivalent
+  # (HINDSIGHT_API_TOKEN, OMP_AUTH_BROKER_TOKEN, XAI_API_KEY, ...) — supply those
+  # out of band (e.g. via sops-nix) instead.
+  secretSentinel = "__omp_unset_sentinel__";
+  secretPaths = [
+    [
+      "auth"
+      "broker"
+      "token"
+    ]
+    [
+      "hindsight"
+      "apiToken"
+    ]
+    [
+      "mnemopi"
+      "embeddingApiKey"
+    ]
+    [
+      "mnemopi"
+      "llmApiKey"
+    ]
+    [
+      "searxng"
+      "token"
+    ]
+    [
+      "searxng"
+      "basicPassword"
+    ]
+    [
+      "dev"
+      "autoqaPush"
+      "token"
+    ]
+  ];
+  leakedSecrets =
+    lib.filter (p: lib.attrByPath p secretSentinel cfg.settings != secretSentinel) secretPaths
+    ++ lib.optional (cfg.hindsight.settings ? apiToken) [
+      "hindsight"
+      "apiToken"
+    ];
 in
 {
   options.programs.omp = {
@@ -200,8 +244,12 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = !(cfg.hindsight.settings ? apiToken);
-        message = "programs.omp.hindsight.settings.apiToken would write the token into the world-readable Nix store; set the HINDSIGHT_API_TOKEN environment variable instead.";
+        assertion = leakedSecrets == [ ];
+        message =
+          "programs.omp: secret value(s) "
+          + lib.concatMapStringsSep ", " (lib.concatStringsSep ".") leakedSecrets
+          + " would be written into the world-readable Nix store. Supply them via environment variables "
+          + "(e.g. HINDSIGHT_API_TOKEN, OMP_AUTH_BROKER_TOKEN, XAI_API_KEY) from your secret manager instead.";
       }
     ];
 
