@@ -36,14 +36,86 @@ let
       }
     ) attrs;
 
-  # Skills may be a store path / local directory (linked recursively) or an
-  # inline attrset `{ source = ...; }`.
-  skillFiles = lib.mapAttrs' (
+  # Parse "github:owner/repo[/subdir]@ref" into its parts, or null if it does
+  # not match. A 40-char lowercase-hex ref is treated as a commit (allows pure
+  # evaluation); anything else is a branch/tag passed to `builtins.fetchGit`.
+  parseGithubRef =
+    s:
+    let
+      m = builtins.match "github:([^/]+)/([^/@]+)(/[^@]*)?@(.+)" s;
+    in
+    if m == null then
+      null
+    else
+      {
+        owner = builtins.elemAt m 0;
+        repo = builtins.elemAt m 1;
+        subdir =
+          let
+            raw = builtins.elemAt m 2;
+          in
+          if raw == null then "" else lib.removePrefix "/" raw;
+        ref = builtins.elemAt m 3;
+      };
+
+  isCommitHash = s: builtins.match "[0-9a-f]{40}" s != null;
+
+  fetchGithubSkill =
+    {
+      owner,
+      repo,
+      subdir,
+      ref,
+    }:
+    let
+      fetched = builtins.fetchGit (
+        {
+          url = "https://github.com/${owner}/${repo}";
+        }
+        // (if isCommitHash ref then { rev = ref; } else { inherit ref; })
+      );
+      base = builtins.toString fetched;
+    in
+    if subdir != "" then "${base}/${subdir}" else base;
+
+  # A skill value is one of:
+  #   - a path to a directory (linked recursively as `skills/<name>/`)
+  #   - a path to a SKILL.md file (linked as `skills/<name>/SKILL.md`)
+  #   - a "github:owner/repo[/subdir]@ref" string (fetched, linked recursively)
+  #   - an inline string (written to `skills/<name>/SKILL.md`)
+  #   - a `{ src; subdir ? ""; }` attrset for a pre-fetched source (recursive)
+  #   - any other `home.file` attrset (escape hatch, passed through verbatim)
+  mkSkillEntry =
     name: value:
-    lib.nameValuePair "${agentDir}/skills/${name}" (
-      if lib.isAttrs value && !lib.isDerivation value then value else { source = value; }
-    )
-  ) cfg.skills;
+    let
+      target = "${agentDir}/skills/${name}";
+      githubRef = if lib.isString value then parseGithubRef value else null;
+    in
+    if lib.isPath value && lib.pathIsDirectory value then
+      lib.nameValuePair target {
+        source = value;
+        recursive = true;
+      }
+    else if lib.isPath value then
+      lib.nameValuePair "${target}/SKILL.md" { source = value; }
+    else if githubRef != null then
+      lib.nameValuePair target {
+        source = fetchGithubSkill githubRef;
+        recursive = true;
+      }
+    else if lib.isString value then
+      lib.nameValuePair "${target}/SKILL.md" { text = value; }
+    else if lib.isAttrs value && !lib.isDerivation value && value ? src then
+      lib.nameValuePair target {
+        source = if value.subdir or "" != "" then "${value.src}/${value.subdir}" else "${value.src}";
+        recursive = true;
+      }
+    else if lib.isAttrs value && !lib.isDerivation value then
+      lib.nameValuePair target value
+    else
+      lib.nameValuePair target { source = value; };
+
+  skillFiles = lib.mapAttrs' mkSkillEntry cfg.skills;
 
   # Extension modules are discovered from `~/.omp/agent/extensions/`; link each
   # by its file name.
@@ -195,6 +267,12 @@ in
       description = "Prompt template files written to `~/.omp/agent/prompts/<name>.md`.";
     };
 
+    instructions = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.either lib.types.lines lib.types.path);
+      default = { };
+      description = "Instruction files written to `~/.omp/agent/instructions/<name>.md`.";
+    };
+
     themes = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
@@ -204,8 +282,13 @@ in
     skills = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      example = lib.literalExpression "{ my-skill = ./skills/my-skill; }";
-      description = "Skills linked into `~/.omp/agent/skills/<name>` (a path or a `home.file` attrset).";
+      example = lib.literalExpression ''{ my-skill = ./skills/my-skill; remote = "github:owner/repo/path@main"; }'';
+      description = ''
+        Skills linked into `~/.omp/agent/skills/<name>`. Each value is a path to a
+        skill directory or a `SKILL.md` file, an inline `SKILL.md` string, a
+        `"github:owner/repo[/subdir]@ref"` source, a `{ src; subdir ? ""; }`
+        attrset, or any `home.file` attrset (escape hatch).
+      '';
     };
 
     extensions = lib.mkOption {
@@ -304,6 +387,7 @@ in
       (docFiles "commands" "md" cfg.commands)
       (docFiles "agents" "md" cfg.agents)
       (docFiles "prompts" "md" cfg.prompts)
+      (docFiles "instructions" "md" cfg.instructions)
       (jsonFiles "themes" cfg.themes)
       skillFiles
       extensionFiles

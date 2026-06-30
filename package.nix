@@ -9,6 +9,7 @@
 # loader at launch instead of patching its interpreter.
 {
   lib,
+  stdenv,
   stdenvNoCC,
   fetchurl,
   makeWrapper,
@@ -59,10 +60,10 @@ stdenvNoCC.mkDerivation {
       ''
         runHook preInstall
         install -Dm755 "$src" "$out/libexec/omp/omp"
-        makeWrapper "$(cat ${stdenvNoCC.cc}/nix-support/dynamic-linker)" "$out/bin/omp" \
+        makeWrapper "$(cat ${stdenv.cc}/nix-support/dynamic-linker)" "$out/bin/omp" \
           --add-flags "$out/libexec/omp/omp" \
           --argv0 omp \
-          --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ stdenvNoCC.cc.cc.lib ]}"
+          --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ stdenv.cc.cc.lib ]}"
         runHook postInstall
       '';
 

@@ -45,7 +45,9 @@ nix run github:jamtur01/nix-omp
     # mcpServers.fetch = { command = "uvx"; args = [ "mcp-server-fetch" ]; };
     # rules.style = ./rules/style.md;        # ~/.omp/agent/rules/style.md
     # commands.deploy = ./commands/deploy.md;
-    # skills.my-skill = ./skills/my-skill;   # ~/.omp/agent/skills/my-skill
+    # instructions.house = ./instructions/house.md;
+    # skills.my-skill = ./skills/my-skill;   # dir, SKILL.md, inline, or github:
+    # skills.remote = "github:owner/repo/path@main";
     # extensions = [ ./extensions/my-extension.ts ];
     # tools = [ ./tools/my-tool.ts ];        # ~/.omp/agent/tools/
     # hooks.pre.bash = ./hooks/pre-bash.sh;  # fires before the bash tool
@@ -102,9 +104,9 @@ The Home Manager module writes into the default profile's agent directory,
 | `models` | `models.yml` |
 | `keybindings` | `keybindings.yml` |
 | `mcpServers` | `mcp.json` |
-| `rules.<n>` / `commands.<n>` / `agents.<n>` / `prompts.<n>` | `<dir>/<n>.md` |
+| `rules.<n>` / `commands.<n>` / `agents.<n>` / `prompts.<n>` / `instructions.<n>` | `<dir>/<n>.md` |
 | `themes.<n>` | `themes/<n>.json` |
-| `skills.<n>` | `skills/<n>` |
+| `skills.<n>` | `skills/<n>` (dir / `SKILL.md` / inline string / `github:owner/repo[/subdir]@ref` / `{ src; subdir; }`) |
 | `extensions` / `tools` | `extensions/<basename>` / `tools/<basename>` |
 | `hooks.pre.<n>` / `hooks.post.<n>` | `hooks/pre/<n>` / `hooks/post/<n>` (executable; `<n>` = tool or `*`) |
 | `systemPrompt` / `appendSystemPrompt` | `SYSTEM.md` / `APPEND_SYSTEM.md` |

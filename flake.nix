@@ -37,8 +37,19 @@
 
       formatter = forAllSystems (system: (pkgsFor system).nixfmt);
 
-      checks = forAllSystems (system: {
-        omp = self.packages.${system}.omp;
-      });
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = pkgsFor system;
+        in
+        {
+          omp = self.packages.${system}.omp;
+          hm-module = import ./checks/hm-module.nix {
+            inherit pkgs;
+            inherit (pkgs) lib;
+            hmModule = self.homeModules.default;
+          };
+        }
+      );
     };
 }
