@@ -27,6 +27,8 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v22
 
       - name: Refresh VERSION.json
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash ./update.sh
 
       - name: Read version
