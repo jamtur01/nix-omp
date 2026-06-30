@@ -34,7 +34,8 @@ for system in "${!assets[@]}"; do
   hashes_json="$(jq --arg s "$system" --arg h "$hash" '.[$s] = $h' <<<"$hashes_json")"
 done
 
-jq -n --arg version "$version" --argjson hashes "$hashes_json" \
+# Sort keys so re-running on an unchanged release is a no-op (clean git diff).
+jq -nS --arg version "$version" --argjson hashes "$hashes_json" \
   '{version: $version, hashes: $hashes}' >"$version_file"
 
 echo "wrote $version_file"
