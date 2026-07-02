@@ -120,6 +120,12 @@ The Home Manager module writes into the default profile's agent directory,
 `./update.sh` bumps `VERSION.json` to the latest release and refreshes all four
 platform hashes (needs `gh`, `nix`, `jq`).
 
+The `update` workflow runs it hourly and, when a new release appears, verifies
+every platform binary fetches and hash-checks and the module still evaluates,
+then commits the bump straight to `main` (no PR). Trigger it on demand with
+`gh workflow run update.yml`, or fire it from an external release watcher with
+`gh api repos/jamtur01/nix-omp/dispatches -f event_type=omp-release`.
+
 ## Prior art
 
 - [git.molez.org/mandlm/omp-nix](https://git.molez.org/mandlm/omp-nix) — the

@@ -1,18 +1,24 @@
 name: update
 
-# Check for a new oh-my-pi release twice daily and maintain a single auto-update PR.
-# A fixed branch means create-pull-request updates the same PR in place each run,
-# so only the latest version is ever open — older proposals are superseded, not
-# stacked.
+# Poll for a new oh-my-pi release and commit the bump straight to main.
+# There is no PR gate, so a build check verifies every platform binary fetches
+# and hash-verifies (fixed-output derivations build on any runner) and the
+# home-manager module still evaluates before the commit is pushed.
+#
+# Triggers: hourly cron, manual dispatch, and repository_dispatch (type
+# "omp-release") so an external watcher can fire an update the moment upstream
+# publishes — send it with:
+#   gh api repos/jamtur01/nix-omp/dispatches -f event_type=omp-release
 
 on:
   schedule:
-    - cron: "0 6,18 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [omp-release]
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: omp-update
@@ -31,19 +37,38 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash ./update.sh
 
-      - name: Read version
-        id: ver
-        run: echo "version=$(jq -r .version VERSION.json)" >> "$GITHUB_OUTPUT"
+      - name: Detect change
+        id: diff
+        run: |
+          if git diff --quiet -- VERSION.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already at the latest release; nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(jq -r .version VERSION.json)" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Open or update PR
-        uses: peter-evans/create-pull-request@v8
-        with:
-          branch: omp-update
-          delete-branch: true
-          commit-message: "chore: update omp to ${{ steps.ver.outputs.version }}"
-          title: "chore: update omp to ${{ steps.ver.outputs.version }}"
-          body: |
-            Automated update to oh-my-pi `${{ steps.ver.outputs.version }}`.
+      - name: Verify all platform hashes
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          for sys in x86_64-linux aarch64-linux x86_64-darwin aarch64-darwin; do
+            echo "::group::fetch+verify $sys"
+            nix build --no-link --print-build-logs ".#packages.$sys.omp.src"
+            echo "::endgroup::"
+          done
 
-            Hashes are read from the GitHub release asset digests by `update.sh`;
-            Nix verifies each binary against them at build time.
+      - name: Build native package and module check
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          nix build --no-link --print-build-logs \
+            .#packages.x86_64-linux.omp \
+            .#checks.x86_64-linux.hm-module
+
+      - name: Commit to main
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json
+          git commit -m "chore: update omp to ${{ steps.diff.outputs.version }}"
+          git push
