@@ -1,13 +1,13 @@
 name: update
 
-# Check for a new oh-my-pi release daily and maintain a single auto-update PR.
+# Check for a new oh-my-pi release twice daily and maintain a single auto-update PR.
 # A fixed branch means create-pull-request updates the same PR in place each run,
 # so only the latest version is ever open — older proposals are superseded, not
 # stacked.
 
 on:
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 6,18 * * *"
   workflow_dispatch:
 
 permissions:
