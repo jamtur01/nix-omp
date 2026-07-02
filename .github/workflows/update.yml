@@ -48,13 +48,24 @@ jobs:
             echo "version=$(jq -r .version VERSION.json)" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify all platform hashes
+      - name: Verify recorded hashes match served binaries
         if: steps.diff.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.diff.outputs.version }}
         run: |
-          for sys in x86_64-linux aarch64-linux x86_64-darwin aarch64-darwin; do
-            echo "::group::fetch+verify $sys"
-            nix build --no-link --print-build-logs ".#packages.$sys.omp.src"
-            echo "::endgroup::"
+          base="https://github.com/can1357/oh-my-pi/releases/download/v${VERSION}"
+          declare -A assets=(
+            [x86_64-linux]=omp-linux-x64   [aarch64-linux]=omp-linux-arm64
+            [x86_64-darwin]=omp-darwin-x64 [aarch64-darwin]=omp-darwin-arm64
+          )
+          for sys in "${!assets[@]}"; do
+            want="$(jq -r --arg s "$sys" '.hashes[$s]' VERSION.json)"
+            got="$(nix store prefetch-file --json "$base/${assets[$sys]}" | jq -r .hash)"
+            if [[ "$want" != "$got" ]]; then
+              echo "::error::$sys hash mismatch: VERSION.json=$want served=$got"
+              exit 1
+            fi
+            echo "$sys ok ($got)"
           done
 
       - name: Build native package and module check
