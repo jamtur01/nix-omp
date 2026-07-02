@@ -95,6 +95,9 @@ let
         };
         systemPrompt = "You are a helpful assistant.";
         appendSystemPrompt = "Always cite sources.";
+        agentsMd = "# Conventions\n\nUse tabs.";
+        rulesMd = "Never commit unless asked.";
+        watchdogMd = "Especially watch for secrets in the Nix store.";
       };
     };
 
@@ -131,6 +134,9 @@ let
     ".omp/agent/hooks/post/*"
     ".omp/agent/SYSTEM.md"
     ".omp/agent/APPEND_SYSTEM.md"
+    ".omp/agent/AGENTS.md"
+    ".omp/agent/RULES.md"
+    ".omp/agent/WATCHDOG.md"
   ];
 
   missing = builtins.filter (p: !(builtins.hasAttr p files)) expectations;

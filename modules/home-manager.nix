@@ -36,6 +36,16 @@ let
       }
     ) attrs;
 
+  # Map a nullable (string | path) into a single top-level home.file entry under
+  # the agent dir, or nothing when null. Paths link by source; strings are
+  # written verbatim.
+  topDocFile =
+    file: value:
+    lib.optionalAttrs (value != null) {
+      "${agentDir}/${file}" =
+        if lib.isPath value || lib.isStorePath value then { source = value; } else { text = value; };
+    };
+
   # Parse "github:owner/repo[/subdir]@ref" into its parts, or null if it does
   # not match. A 40-char lowercase-hex ref is treated as a commit (allows pure
   # evaluation); anything else is a branch/tag passed to `builtins.fetchGit`.
@@ -366,6 +376,40 @@ in
       default = null;
       description = "Appended to the default system prompt (`~/.omp/agent/APPEND_SYSTEM.md`).";
     };
+
+    agentsMd = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either lib.types.lines lib.types.path);
+      default = null;
+      example = lib.literalExpression ''"# Conventions\n\nUse tabs."'';
+      description = ''
+        User-level context written to `~/.omp/agent/AGENTS.md`. The native
+        discovery provider loads it into every session's opening context (the
+        omp-native equivalent of `CLAUDE.md`); a native `AGENTS.md` shadows a
+        user-level `~/.claude/CLAUDE.md`.
+      '';
+    };
+
+    rulesMd = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either lib.types.lines lib.types.path);
+      default = null;
+      example = lib.literalExpression ''"Never commit unless asked."'';
+      description = ''
+        User-level sticky rules written to `~/.omp/agent/RULES.md`. Loaded as an
+        always-apply rule re-attached near the current turn, so it holds across
+        long sessions. Keep it short; put bulk guidance in `agentsMd`.
+      '';
+    };
+
+    watchdogMd = lib.mkOption {
+      type = lib.types.nullOr (lib.types.either lib.types.lines lib.types.path);
+      default = null;
+      example = lib.literalExpression ''"Especially watch for secrets in the Nix store."'';
+      description = ''
+        User-level advisor guidance written to `~/.omp/agent/WATCHDOG.md`.
+        Appended to the advisor's system prompt (review priorities and traps);
+        not injected into the primary agent's context.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -414,6 +458,9 @@ in
       (lib.mkIf (cfg.appendSystemPrompt != null) {
         "${agentDir}/APPEND_SYSTEM.md".text = cfg.appendSystemPrompt;
       })
+      (topDocFile "AGENTS.md" cfg.agentsMd)
+      (topDocFile "RULES.md" cfg.rulesMd)
+      (topDocFile "WATCHDOG.md" cfg.watchdogMd)
     ];
   };
 }

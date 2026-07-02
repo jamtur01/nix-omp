@@ -53,6 +53,9 @@ nix run github:jamtur01/nix-omp
     # hooks.pre.bash = ./hooks/pre-bash.sh;  # fires before the bash tool
     # hooks.post."*" = ./hooks/post-all.sh;  # fires after every tool
     # appendSystemPrompt = "Be concise.";
+    # agentsMd = ./AGENTS.md;                # ~/.omp/agent/AGENTS.md (context)
+    # rulesMd = "Never commit unless asked."; # ~/.omp/agent/RULES.md (sticky)
+    # watchdogMd = ./WATCHDOG.md;            # ~/.omp/agent/WATCHDOG.md (advisor)
 
     hindsight = {
       enable = true;                         # memory.backend = hindsight
@@ -110,6 +113,7 @@ The Home Manager module writes into the default profile's agent directory,
 | `extensions` / `tools` | `extensions/<basename>` / `tools/<basename>` |
 | `hooks.pre.<n>` / `hooks.post.<n>` | `hooks/pre/<n>` / `hooks/post/<n>` (executable; `<n>` = tool or `*`) |
 | `systemPrompt` / `appendSystemPrompt` | `SYSTEM.md` / `APPEND_SYSTEM.md` |
+| `agentsMd` / `rulesMd` / `watchdogMd` | `AGENTS.md` / `RULES.md` / `WATCHDOG.md` (inline string or path) |
 
 ## Updating
 
