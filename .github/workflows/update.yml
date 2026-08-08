@@ -12,7 +12,7 @@ name: update
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "0 2 * * *"
   workflow_dispatch:
   repository_dispatch:
     types: [omp-release]
