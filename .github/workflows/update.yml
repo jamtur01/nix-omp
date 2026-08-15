@@ -5,14 +5,15 @@ name: update
 # and hash-verifies (fixed-output derivations build on any runner) and the
 # home-manager module still evaluates before the commit is pushed.
 #
-# Triggers: hourly cron, manual dispatch, and repository_dispatch (type
+# Triggers: pushes to main, manual dispatch, and repository_dispatch (type
 # "omp-release") so an external watcher can fire an update the moment upstream
 # publishes — send it with:
 #   gh api repos/jamtur01/nix-omp/dispatches -f event_type=omp-release
+# There is no schedule; nothing polls on its own.
 
 on:
-  schedule:
-    - cron: "0 2 * * *"
+  push:
+    branches: [main]
   workflow_dispatch:
   repository_dispatch:
     types: [omp-release]
